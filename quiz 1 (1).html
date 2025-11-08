@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<title>Quiz Adolescência e Álcool - Nível PRO</title>
+<style>
+  body { 
+    font-family: Arial, sans-serif; 
+    background: #e0f7fa; 
+    text-align: center; 
+    padding: 20px; 
+  }
+
+  .quiz-container { 
+    background: #fff; 
+    padding: 20px; 
+    border-radius: 15px; 
+    max-width: 650px; 
+    margin: auto; 
+    box-shadow: 0 0 15px rgba(0,0,0,0.2); 
+    transition: opacity 0.6s, transform 0.6s;
+  }
+
+  .question { 
+    font-size: 24px; 
+    margin-bottom: 20px; 
+    transition: opacity 0.5s; 
+  }
+
+  .options button { 
+    display: block; 
+    width: 90%; 
+    margin: 12px auto; 
+    padding: 18px; 
+    font-size: 20px; 
+    cursor: pointer; 
+    border-radius: 12px; 
+    border: none; 
+    transition: transform 0.2s, background 0.3s; 
+  }
+
+  .options button:hover { 
+    transform: scale(1.05); 
+    background-color: #b2ebf2; 
+  }
+
+  #feedback { 
+    font-size: 28px; 
+    margin-top: 15px; 
+    height: 50px; 
+    transition: transform 0.3s; 
+  }
+
+  #result { 
+    font-size: 24px; 
+    margin-top: 25px; 
+    display:none; 
+    opacity: 0;
+    transform: scale(0.9);
+  }
+
+  #result.show {
+    display: block;
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  #restartButton {
+    margin-top: 20px;
+    padding: 15px 25px;
+    font-size: 20px;
+    background-color: #00bcd4;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.3s, transform 0.2s;
+  }
+
+  #restartButton:hover {
+    background-color: #0097a7;
+    transform: scale(1.05);
+  }
+
+  canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+  #startScreen { font-size: 22px; }
+  #startButton { 
+    padding: 18px 30px; 
+    font-size: 22px; 
+    border-radius: 12px; 
+    border: none; 
+    background-color: #00bcd4; 
+    color: white; 
+    cursor: pointer; 
+    transition: transform 0.2s; 
+  }
+  #startButton:hover { transform: scale(1.1); background-color: #0097a7; }
+</style>
+</head>
+<body>
+
+<div class="quiz-container" id="startScreen">
+  <div>Quiz Adolescência e Álcool 💖</div>
+  <div style="margin:10px 0;">Autores: Anna Beatriz Alves Pegorá Ferreira, Laís Rebouças Santos, Gabriela March</div>
+  <button id="startButton">Começar Quiz</button>
+</div>
+
+<div class="quiz-container" id="quiz" style="display:none;">
+  <div class="question" id="question"></div>
+  <div class="options" id="options"></div>
+  <div id="feedback"></div>
+</div>
+
+<div class="quiz-container" id="result"></div>
+
+<!-- Sons -->
+<audio id="faustaoErro" src="faustao-errou.mp3"></audio>
+<audio id="somAcerto" src="bora-bioll.mp3"></audio>
+<canvas id="confetti"></canvas>
+
+<script>
+const quizData = [
+  { q: "O que caracteriza a dependência do álcool?", a: ["Consumo apenas em festas", "Necessidade psicológica e/ou física de consumir álcool apesar de prejuízos", "Beber socialmente sem efeitos", "Tomar apenas bebidas sem álcool"], correct: 1 },
+  { q: "Por que o cérebro adolescente é mais vulnerável ao álcool?", a: ["Porque já está totalmente desenvolvido", "Porque o córtex pré-frontal ainda está amadurecendo", "Porque jovens têm mais massa cerebral", "Porque a digestão do álcool é mais lenta"], correct: 1 },
+  { q: "Qual neurotransmissor é afetado pelo álcool e ligado ao prazer?", a: ["Serotonina", "Acetilcolina", "Dopamina", "GABA"], correct: 2 },
+  { q: "Qual é um risco de começar a beber álcool cedo na adolescência?", a: ["Melhor rendimento escolar", "Problemas de memória e atenção", "Maior crescimento físico", "Nenhum risco"], correct: 1 },
+  { q: "Uma consequência cognitiva do consumo precoce é:", a: ["Melhora da memória", "Déficit de memória e atenção", "Nenhuma consequência", "Mais energia"], correct: 1 },
+  { q: "Qual fator social contribui para o consumo precoce?", a: ["Pressão dos amigos", "Maior idade", "Clima frio", "Nenhum"], correct: 0 },
+  { q: "Um sinal de dependência pode ser:", a: ["Beber ocasionalmente", "Necessidade de doses maiores e irritabilidade sem álcool", "Provar uma vez", "Dormir mais"], correct: 1 },
+  { q: "Qual a melhor forma de prevenção escolar?", a: ["Evitar falar do tema", "Educação e envolvimento da família", "Permitir consumo supervisionado", "Ignorar o tema"], correct: 1 }
+];
+
+let currentQuestion = 0;
+let score = 0;
+let confettiAnimation = null; // guarda o ID da animação de confete
+const questionEl = document.getElementById("question");
+const optionsEl = document.getElementById("options");
+const feedbackEl = document.getElementById("feedback");
+
+// Botão inicial
+document.getElementById("startButton").addEventListener("click", startQuiz);
+
+function startQuiz() {
+  score = 0;
+  currentQuestion = 0;
+
+  // Para o confete se ainda estiver rodando
+  stopConfetti();
+
+  document.getElementById("startScreen").style.display = "none";
+  document.getElementById("result").classList.remove("show");
+  document.getElementById("result").style.display = "none";
+  document.getElementById("quiz").style.display = "block";
+  showQuestion();
+}
+
+// Mostrar pergunta
+function showQuestion() {
+  feedbackEl.innerText = "";
+  const q = quizData[currentQuestion];
+  questionEl.style.opacity = 0;
+  optionsEl.style.opacity = 0;
+  setTimeout(() => {
+    questionEl.innerText = q.q;
+    optionsEl.innerHTML = "";
+    q.a.forEach((option, index) => {
+      const button = document.createElement("button");
+      button.innerText = option;
+      button.onclick = () => selectAnswer(index, button);
+      optionsEl.appendChild(button);
+    });
+    questionEl.style.opacity = 1;
+    optionsEl.style.opacity = 1;
+  }, 300);
+}
+
+// Selecionar resposta
+function selectAnswer(index, button) {
+  const correctIndex = quizData[currentQuestion].correct;
+  if(index === correctIndex){
+    score++;
+    feedbackEl.innerText = "✅ Acertou!";
+    feedbackEl.style.color = "green";
+    document.getElementById("somAcerto").play();
+  } else {
+    feedbackEl.innerText = "❌ Errou!";
+    feedbackEl.style.color = "red";
+    document.getElementById("faustaoErro").play();
+  }
+
+  feedbackEl.style.transform = "scale(1.3)";
+  setTimeout(()=> feedbackEl.style.transform = "scale(1)", 300);
+  button.style.transform = "scale(1.2)";
+  setTimeout(()=> button.style.transform = "scale(1)", 200);
+
+  currentQuestion++;
+  setTimeout(() => {
+    if(currentQuestion < quizData.length) showQuestion();
+    else showResult();
+  }, 900);
+}
+
+// Mostrar resultado
+function showResult() {
+  const resultDiv = document.getElementById("result");
+  document.getElementById("quiz").style.display = "none";
+
+  let color = score >= 6 ? "#2ecc71" : "#e74c3c"; // verde ou vermelho
+
+  resultDiv.innerHTML = `
+    <div style="color:${color}; font-weight:bold;">
+      ${score >= 6 ? "🎉 Parabéns, você ganhou! 🎉" : "💪 Tente novamente, você consegue!"}
+    </div>
+    <p>Acertou ${score} de ${quizData.length} perguntas.</p>
+    <button id="restartButton">🔁 Jogar novamente</button>
+  `;
+
+  resultDiv.style.display = "block";
+  setTimeout(() => resultDiv.classList.add("show"), 50);
+
+  document.getElementById("restartButton").addEventListener("click", startQuiz);
+
+  if(score >= 6) launchConfetti();
+}
+
+// Confete
+function launchConfetti() {
+  const canvas = document.getElementById("confetti");
+  const ctx = canvas.getContext("2d");
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  
+  const confetti = [];
+  for(let i=0; i<200; i++){
+    confetti.push({x:Math.random()*canvas.width, y:Math.random()*canvas.height-500, r:Math.random()*6+4, d:Math.random()*10+5, color:`hsl(${Math.random()*360}, 100%, 50%)`, tilt:Math.random()*10-10});
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    confetti.forEach(c=>{
+      ctx.beginPath();
+      ctx.lineWidth = c.r/2;
+      ctx.strokeStyle = c.color;
+      ctx.moveTo(c.x+c.tilt+c.r/4, c.y);
+      ctx.lineTo(c.x+c.tilt, c.y+c.r);
+      ctx.stroke();
+      c.y += (Math.cos(c.d)+3+c.r/2)/2;
+      c.x += Math.sin(c.d);
+      if(c.y > canvas.height) c.y = -10;
+      if(c.x > canvas.width) c.x = 0;
+    });
+    confettiAnimation = requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+// Função para parar o confete
+function stopConfetti() {
+  if (confettiAnimation) {
+    cancelAnimationFrame(confettiAnimation);
+    confettiAnimation = null;
+    const ctx = document.getElementById("confetti").getContext("2d");
+    ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+  }
+}
+</script>
+</body>
+</html>
